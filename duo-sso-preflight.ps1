@@ -1,5 +1,5 @@
 # File: duo-sso-preflight.ps1
-# Version: v0.2.0
+# Version: v0.2.1
 # Author: Konnor Klercke
 # Note: This script is not optimized. It could (and will) be made faster.
 
@@ -69,27 +69,6 @@ Import-Module Microsoft.Graph.Users
     # Reserved                   = 32769 # 0b1000000000000000
 }
 
-# User error "localizations"
-# UserErrorDescriptions[UserError] = String
-$UserErrorDescriptions = @{
-    # Email errors
-    [UserError]::EmailDomainIncorrectError      = "Email domain does not match"
-    [UserError]::EmailAttributeEmptyError       = "AD email attribute empty"
-    [UserError]::EmailAttributeIncorrectError   = "AD email attribute does not match provided email"
-    
-    # AD lookup errors
-    [UserError]::ADSearchAccountNameError  = "Could not find user in AD when searching by username"
-    [UserError]::ADSearchRealNameError     = "Could not find user in AD when searching by real name"
-
-    # Entra connect errors
-    [UserError]::ConnectConsistencyGuidMissingErorr    = "AD mS-DS-ConsistencyGUID attribute empty"
-
-    # Entra account errors
-    [UserError]::EntraSearchImmutableIdError = "Could not find user in Entra when searching by ImmutableId"
-    [UserError]::EntraSearchEmailError       = "Could not find user in Entra when searching by email address"
-    [UserError]::EntraSearchRealNameError    = "Could not find user in Entra when searching by real name"
-}
-
 # Define User class
 class User {
     [string]        $LastName
@@ -113,6 +92,27 @@ class User {
         $this.ErrorCode = [UserError]::NoError
     }
 
+    # User error "localizations"
+    # UserErrorDescriptions[UserError] = String
+    $UserErrorDescriptions = @{
+        # Email errors
+        [UserError]::EmailDomainIncorrectError      = "Email domain does not match"
+        [UserError]::EmailAttributeEmptyError       = "AD email attribute empty"
+        [UserError]::EmailAttributeIncorrectError   = "AD email attribute does not match provided email"
+    
+        # AD lookup errors
+        [UserError]::ADSearchAccountNameError  = "Could not find user in AD when searching by username"
+        [UserError]::ADSearchRealNameError     = "Could not find user in AD when searching by real name"
+
+        # Entra connect errors
+        [UserError]::ConnectConsistencyGuidMissingErorr    = "AD mS-DS-ConsistencyGUID attribute empty"
+
+        # Entra account errors
+        [UserError]::EntraSearchImmutableIdError = "Could not find user in Entra when searching by ImmutableId"
+        [UserError]::EntraSearchEmailError       = "Could not find user in Entra when searching by email address"
+        [UserError]::EntraSearchRealNameError    = "Could not find user in Entra when searching by real name"
+    }
+
     # Update note to include reasons why this user may not be compliant
     [void] UpdateNote([string] $TextToAdd) {
         if ($this.Note -eq "") {
@@ -126,7 +126,7 @@ class User {
     [void] UpdateError([UserError] $ErrorToAdd) {
         $this.ErrorCode += $ErrorToAdd
 
-        $this.UpdateNote($Global:UserErrorDescriptions[$ErrorToAdd])
+        $this.UpdateNote($this.UserErrorDescriptions[$ErrorToAdd])
     }
 }
 
