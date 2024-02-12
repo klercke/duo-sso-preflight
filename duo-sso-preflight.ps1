@@ -174,8 +174,8 @@ Write-Output "Found $FailedEmailDomainCount users with the incorrect email domai
 
 # Check AD accounts
 Write-Output "Checking AD..."
-Write-Output "Checking via sAMAccountName..."
 $ADDomain = Get-ADDomain
+Write-Output "Checking via sAMAccountName..."
 $FailedSamAccountCount = 0
 $FailedRealNameCount = 0
 $NoConsistencyGuidCount = 0
@@ -319,3 +319,4 @@ else {
 }
 
 if ($DisconnectFromGraph) { Disconnect-MgGraph | Out-Null }
+

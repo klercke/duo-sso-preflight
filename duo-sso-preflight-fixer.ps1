@@ -1,5 +1,5 @@
 # File: duo-sso-preflight-fixer.ps1
-# Version: v0.2.0
+# Version: v0.2.1
 # Author: Konnor Klercke
 # Description: Tool to automatically fix errors found by duo-sso-preflight-checker
 
@@ -7,7 +7,13 @@
 [cmdletbinding()]
 param(
     [Parameter(HelpMessage="Filename of user data CSV to import", Mandatory=$true)]
-    [string]$UserCsv
+    [string]$UserCsv,
+
+    [Parameter(HelpMessage="Do not make any real changes")]
+    [bool]$WhatIfPreference = $true,
+
+    [Parameter(HelpMessage="Disconnect from Graph after running")]
+    [bool]$DisconnectFromGraph = $true
 )
 
 # Definitions from main preflight file
@@ -45,26 +51,6 @@ param(
     # Reserved                   = 32769 # 0b1000000000000000
 }
 
-# User error "localizations"
-# UserErrorDescriptions[UserError] = String
-$UserErrorDescriptions = @{
-    # Email errors
-    [UserError]::EmailDomainIncorrectError      = "Email domain does not match"
-    [UserError]::EmailAttributeEmptyError       = "AD email attribute empty"
-    [UserError]::EmailAttributeIncorrectError   = "AD email attribute does not match provided email"
-    
-    # AD lookup errors
-    [UserError]::ADSearchAccountNameError  = "Could not find user in AD when searching by username"
-    [UserError]::ADSearchRealNameError     = "Could not find user in AD when searching by real name"
-
-    # Entra connect errors
-    [UserError]::ConnectConsistencyGuidMissingErorr    = "AD mS-DS-ConsistencyGUID attribute empty"
-
-    # Entra account errors
-    [UserError]::EntraSearchImmutableIdError = "Could not find user in Entra when searching by ImmutableId"
-    [UserError]::EntraSearchEmailError       = "Could not find user in Entra when searching by email address"
-    [UserError]::EntraSearchRealNameError    = "Could not find user in Entra when searching by real name"
-}
 
 # Define User class
 class User {
@@ -94,7 +80,28 @@ class User {
         $this.ErrorCode = $ErrorCode
     }
 
-    # Update note to include reasons why this user may not be compliant
+		# User error "localizations"
+		# UserErrorDescriptions[UserError] = String
+		$UserErrorDescriptions = @{
+				# Email errors
+				[UserError]::EmailDomainIncorrectError      = "Email domain does not match"
+				[UserError]::EmailAttributeEmptyError       = "AD email attribute empty"
+				[UserError]::EmailAttributeIncorrectError   = "AD email attribute does not match provided email"
+				
+				# AD lookup errors
+				[UserError]::ADSearchAccountNameError  = "Could not find user in AD when searching by username"
+				[UserError]::ADSearchRealNameError     = "Could not find user in AD when searching by real name"
+
+				# Entra connect errors
+				[UserError]::ConnectConsistencyGuidMissingErorr    = "AD mS-DS-ConsistencyGUID attribute empty"
+
+				# Entra account errors
+				[UserError]::EntraSearchImmutableIdError = "Could not find user in Entra when searching by ImmutableId"
+				[UserError]::EntraSearchEmailError       = "Could not find user in Entra when searching by email address"
+				[UserError]::EntraSearchRealNameError    = "Could not find user in Entra when searching by real name"
+		}
+
+		# Update note to include reasons why this user may not be compliant
     [void] UpdateNote([string] $TextToAdd) {
         if ($this.Note -eq "") {
             $this.Note = $TextToAdd
@@ -123,4 +130,20 @@ $UserCount = $Users.Length
 $Users = $Users | Sort-Object -Property LastName
 Write-Output "Imported $UserCount users." 
 
-$Users
+# AD fixes
+Write-Output "Checking AD..."
+$ADDomain = Get-ADDomain
+ForEach ($User in $Users) {
+	# Skip AD lookup for users without any AD errors
+	if ($User.ErrorCode -band 0b000100110110) {
+		Write-Output "Performing AD fixes for $($User.EmailAddress)"
+    $p = @{ 
+        'SearchBase' = $ADDomain.DistinguishedName;
+        'Server' = $ADDomain.PDCEmulator;
+        'Property' = "mS-DS-ConsistencyGUID", 'Mail';
+        'Filter' = "SamAccountName -eq '$(([mailaddress]$User.EmailAddress).User)'"
+		}
+    [Microsoft.ActiveDirectory.Management.ADAccount] $OnPremUser = Get-ADUser @p
+	
+	}
+}
